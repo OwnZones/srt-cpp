@@ -147,7 +147,7 @@ public:
                        std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET socket)> receivedData = nullptr;
 
     ///Callback receiving data no copy
-    std::function<void(const uint8_t* data, size_t size, SRT_MSGCTRL& msgctrl,
+    std::function<void(const uint8_t* data, size_t size, SRT_MSGCTRL& msgCtrl,
                        std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET socket)> receivedDataNoCopy = nullptr;
 
     ///Callback handling disconnecting clients (server and client mode)
