@@ -381,3 +381,61 @@ TEST(TestSrt, SingleSender) {
 
     EXPECT_TRUE(server.stop());
 }
+
+TEST(TestSrt, BindAddressForCaller) {
+    SRTNet server;
+    SRTNet client;
+
+    auto serverCtx = std::make_shared<SRTNet::NetworkConnection>();
+    auto clientCtx = std::make_shared<SRTNet::NetworkConnection>();
+    clientCtx->mObject = 42;
+
+    std::condition_variable connectedCondition;
+    std::mutex connectedMutex;
+    bool connected = false;
+
+    // notice when client connects to server
+    server.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
+                                 std::shared_ptr<SRTNet::NetworkConnection>& ctx) {
+        {
+            std::lock_guard<std::mutex> lock(connectedMutex);
+            connected = true;
+        }
+        connectedCondition.notify_one();
+        auto connectionCtx = std::make_shared<SRTNet::NetworkConnection>();
+        connectionCtx->mObject = 1111;
+        return connectionCtx;
+    };
+
+    ASSERT_TRUE(server.startServer("127.0.0.1", 8010, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, kValidPsk, true, serverCtx));
+    ASSERT_TRUE(client.startClient("127.0.0.1", 8010, "0.0.0.0", 8011, 16, 1000, 100, clientCtx, SRT_LIVE_MAX_PLSIZE,
+                                   kValidPsk));
+
+    // check for client connecting
+    {
+        std::unique_lock<std::mutex> lock(connectedMutex);
+        bool successfulWait = connectedCondition.wait_for(lock, std::chrono::seconds(2), [&]() { return connected; });
+        ASSERT_TRUE(successfulWait) << "Timeout waiting for client to connect";
+    }
+
+    size_t nClients = 0;
+    server.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
+        nClients = activeClients.size();
+        for (const auto& socketNetworkConnectionPair : activeClients) {
+            sockaddr_in6 peerAddress{};
+            int32_t peerAddressSize = sizeof(decltype(peerAddress));
+            ASSERT_EQ(srt_getpeername(socketNetworkConnectionPair.first, reinterpret_cast<sockaddr*>(&peerAddress),
+                                      &peerAddressSize),
+                      0);
+            const sockaddr* socketAddress = reinterpret_cast<const sockaddr*>(&peerAddress);
+            ASSERT_EQ(socketAddress->sa_family, AF_INET);
+            const sockaddr_in* socketAddressV4 = reinterpret_cast<const sockaddr_in*>(socketAddress);
+            char addressIPv4[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &socketAddressV4->sin_addr, addressIPv4, INET_ADDRSTRLEN);
+            std::string ipv4 = std::string(addressIPv4);
+            EXPECT_EQ(ipv4, "127.0.0.1");
+            EXPECT_EQ(ntohs(socketAddressV4->sin_port), 8011);
+        }
+    });
+    EXPECT_EQ(nClients, 1);
+}
