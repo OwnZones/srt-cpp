@@ -26,14 +26,14 @@ public:
     ///
     /// @return True if this SocketAddress is an IPv4 address
     bool isIPv4() {
-        sockaddr_in sa = {0};
+        sockaddr_in sa{};
         return inet_pton(AF_INET, mIP.c_str(), &sa.sin_addr) != 0;
     }
 
     ///
     /// @return True if this SocketAddress is an IPv6 address
     bool isIPv6() {
-        sockaddr_in6 sa = {0};
+        sockaddr_in6 sa{};
         return inet_pton(AF_INET6, mIP.c_str(), &sa.sin6_addr) != 0;
     }
 
