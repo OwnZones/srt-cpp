@@ -195,6 +195,14 @@ public:
 
     /**
      *
+     * @brief Get the underlying, bound SRT socket. Works both in client and server mode.
+     * @returns The bound socket in case there is one, otherwise 0.
+     *
+     */
+    SRTSOCKET getBoundSocket() const;
+
+    /**
+     *
      * @brief Get the current operating mode.
      * @returns The operating mode.
      *

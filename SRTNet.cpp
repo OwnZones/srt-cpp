@@ -485,6 +485,10 @@ std::pair<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>> SRTNet::getConn
     return {0, nullptr};
 }
 
+SRTSOCKET SRTNet::getBoundSocket() const {
+    return mContext;
+}
+
 SRTNet::Mode SRTNet::getCurrentMode() const {
     std::lock_guard<std::mutex> lock(mNetMtx);
     return mCurrentMode;
