@@ -515,16 +515,15 @@ TEST(TestSrt, AutomaticPortSelection) {
         return connectionCtx;
     };
 
-    ASSERT_TRUE(server.startServer("0.0.0.0", 0, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, kValidPsk, false, serverCtx));
+    const uint16_t kAnyPort = 0;
+
+    ASSERT_TRUE(server.startServer("0.0.0.0", kAnyPort, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, kValidPsk, false, serverCtx));
 
     std::pair<std::string, uint16_t> serverIPAndPort = getBindIpAndPortFromSRTSocket(server.getBoundSocket());
     EXPECT_EQ(serverIPAndPort.first, "0.0.0.0");
     EXPECT_GT(serverIPAndPort.second, 1024); // We expect it won't pick a privileged port
 
-    // TODO remove me
-    std::cout << "Server selected port " << serverIPAndPort.second << std::endl;
-
-    ASSERT_TRUE(client.startClient("127.0.0.1", serverIPAndPort.second, "0.0.0.0", 0, 16, 1000, 100, clientCtx,
+    ASSERT_TRUE(client.startClient("127.0.0.1", serverIPAndPort.second, "0.0.0.0", kAnyPort, 16, 1000, 100, clientCtx,
                                    SRT_LIVE_MAX_PLSIZE, kValidPsk));
 
     // check for client connecting
@@ -538,9 +537,6 @@ TEST(TestSrt, AutomaticPortSelection) {
     EXPECT_EQ(clientIPAndPort.first, "127.0.0.1");
     EXPECT_GT(clientIPAndPort.second, 1024); // We expect it won't pick a privileged port
     EXPECT_NE(clientIPAndPort.second, serverIPAndPort.second);
-
-    // TODO remove me
-    std::cout << "Client selected port " << clientIPAndPort.second << std::endl;
 
     size_t nClients = 0;
     server.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
