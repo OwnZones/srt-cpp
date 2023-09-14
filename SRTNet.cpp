@@ -292,7 +292,7 @@ void SRTNet::waitForSRTClient(bool singleSender) {
             }
 
             if (singleSender) {
-                int result = srt_close(mContext);
+                result = srt_close(mContext);
                 if (result == SRT_ERROR) {
                     SRT_LOGGER(true, LOGG_ERROR, "srt_close failed: " << srt_getlasterror_str());
                 }
@@ -390,8 +390,13 @@ bool SRTNet::startClient(const std::string& host,
     }
     freeaddrinfo(svr);
     if (result == SRT_ERROR) {
-        srt_close(mContext);
-        SRT_LOGGER(true, LOGG_FATAL, "srt_connect failed " << std::endl);
+        SRT_LOGGER(true, LOGG_FATAL, "srt_connect failed: " << srt_getlasterror_str() << std::endl);
+        int rejectReason = srt_getrejectreason(mContext);
+        if (rejectReason == SRT_REJECT_REASON::SRT_REJ_BADSECRET ||
+            rejectReason == SRT_REJECT_REASON::SRT_REJ_UNSECURE) {
+            srt_close(mContext);
+            return false;
+        }
     }
 
     mCurrentMode = Mode::client;
@@ -463,8 +468,8 @@ bool SRTNet::createClientSocket() {
         return false;
     }
 
-    const int connection_timeout_ms = 1000;
-    result = srt_setsockopt(mContext, 0, SRTO_CONNTIMEO, &connection_timeout_ms, sizeof connection_timeout_ms);
+    int connection_timeout_ms = kConnectionTimeout.count();
+    result = srt_setsockopt(mContext, 0, SRTO_CONNTIMEO, &connection_timeout_ms, sizeof(connection_timeout_ms));
     if (result == SRT_ERROR) {
         SRT_LOGGER(true, LOGG_FATAL, "srt_setsockopt: SRTO_CONNTIMEO" << srt_getlasterror_str());
         return false;
@@ -533,21 +538,31 @@ void SRTNet::clientWorker() {
                 break;
             }
 
-            //TODO SRT_LOGGER(true, LOGG_ERROR, "SRT connect");
             for (hld = svr; hld; hld = hld->ai_next) {
                 result = srt_connect(mContext, reinterpret_cast<sockaddr*>(hld->ai_addr), hld->ai_addrlen);
                 if (result != SRT_ERROR) {
                     SRT_LOGGER(true, LOGG_ERROR, "Connected to SRT Server " << std::endl)
                     mClientConnected = true;
-                    // Break for-loop on first successfull connect call
+                    // Break for-loop on first successful connect call
                     break;
                 }
             }
             freeaddrinfo(svr);
             if (result == SRT_ERROR) {
-                // Failed to connect caller/client, try again, the connect call waited some time before
-                // giving up
-                //TODO SRT_LOGGER(true, LOGG_FATAL, "srt_connect failed " << std::endl);
+                // Failed to connect caller/client, try again.
+                int rejectReason = srt_getrejectreason(mContext);
+                if (rejectReason != SRT_REJECT_REASON::SRT_REJ_TIMEOUT) {
+                    if (rejectReason == SRT_REJECT_REASON::SRT_REJ_BADSECRET ||
+                        rejectReason == SRT_REJECT_REASON::SRT_REJ_UNSECURE) {
+                        SRT_LOGGER(true, LOGG_FATAL, "srt_connect failed (bad PSK):" << srt_getlasterror_str() << std::endl);
+                    } else {
+                        SRT_LOGGER(true, LOGG_FATAL,
+                                   "srt_connect failed (" << rejectReason << ": " << srt_getlasterror_str()
+                                                          << std::endl);
+                    }
+                    // If it didn't fail with a time out, we need to sleep a while to not burst the CPU.
+                    std::this_thread::sleep_for(kConnectionTimeout);
+                }
                 continue;
             }
         }
@@ -578,11 +593,6 @@ void SRTNet::clientWorker() {
         }
     }
     mClientActive = false;
-/*    mCurrentMode = Mode::unknown;
-    mClientContext = nullptr;
-    srt_close(mContext);
-    mContext = 0;
-    */
 }
 
 std::pair<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>> SRTNet::getConnectedServer() {
@@ -634,7 +644,7 @@ bool SRTNet::sendData(const uint8_t* data, size_t len, SRT_MSGCTRL* msgCtrl, SRT
         return false;
     }
 
-    if (result != len) {
+    if (size_t(result) != len) {
         SRT_LOGGER(true, LOGG_ERROR, "Failed sending all data");
         return false;
     }

@@ -130,7 +130,8 @@ public:
 
     /**
      *
-     * Starts an SRT Client with a specified local address to bind to
+     * Starts an SRT Client with a specified local address to bind to and connects to the server. If the server is
+     * currently not listening for connections, the client will keep on trying to re-connect.
      *
      * @param host Remote host IP or hostname to connect to
      * @param port Remote host port to connect to
@@ -144,7 +145,8 @@ public:
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
-     * @return true if configuration was ok and remote IP port could be resolved, false otherwise
+     * @return true if configuration was accepted and remote IP port could be resolved, false otherwise. It will also
+     * return false in case the connection can be made but the provided PSK doesn't match the PSK on the server.
      */
     bool startClient(const std::string& host,
                      uint16_t port,
@@ -328,4 +330,6 @@ private:
     int mCallerMtu;
     int32_t mCallerPeerIdleTimeout;
     std::string mCallerPsk;
+
+    const std::chrono::milliseconds kConnectionTimeout{1000};
 };

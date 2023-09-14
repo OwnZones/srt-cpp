@@ -214,11 +214,8 @@ TEST(TestSrt, TestPsk) {
     server.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
                                  std::shared_ptr<SRTNet::NetworkConnection>& ctx) { return ctx; };
     ASSERT_TRUE(server.startServer("127.0.0.1", 8009, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, ctx));
-    EXPECT_TRUE(client.startClient("127.0.0.1", 8009, 16, 1000, 100, ctx, SRT_LIVE_MAX_PLSIZE, 5000, kInvalidPsk))
-        << "Expected to be able to start client, but not connect when using incorrect PSK";
-    EXPECT_FALSE(client.isClientConnected())
+    EXPECT_FALSE(client.startClient("127.0.0.1", 8009, 16, 1000, 100, ctx, SRT_LIVE_MAX_PLSIZE, 5000, kInvalidPsk))
         << "Expect to fail when using incorrect PSK";
-    EXPECT_TRUE(client.stop());
 
     ASSERT_TRUE(server.stop());
     ASSERT_TRUE(server.startServer("127.0.0.1", 8009, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, ctx));
