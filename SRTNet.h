@@ -86,8 +86,8 @@ public:
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
-     * @param singleSender set to true to accept just one sender to connect to the server, otherwise the server will
-     * keep waiting and accepting more incoming sender connections
+     * @param singleClient set to true to accept just one client connection at the time to the server, otherwise the
+     * server will keep waiting and accepting more incoming client connections
      * @param ctx optional context used only in the clientConnected callback
      * @return true if server was able to start
      */
@@ -99,12 +99,13 @@ public:
                      int mtu,
                      int32_t peerIdleTimeout = 5000,
                      const std::string& psk = "",
-                     bool singleSender = false,
+                     bool singleClient = false,
                      std::shared_ptr<NetworkConnection> ctx = {});
 
     /**
      *
-     * Starts an SRT Client
+     * Starts an SRT Client and connects to the server. If the server is currently not listening for connections, the
+     * client will keep on trying to re-connect.
      *
      * @param host Remote host IP or hostname
      * @param port Remote host Port
@@ -116,7 +117,8 @@ public:
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
-     * @return true if client was able to connect to the server
+     * @return true if configuration was accepted and remote IP port could be resolved, false otherwise. It will also
+     * return false in case the connection can be made but the provided PSK doesn't match the PSK on the server.
      */
     bool startClient(const std::string& host,
                      uint16_t port,
@@ -216,9 +218,9 @@ public:
     /**
      * 
      * @brief Check if client is connected to remote end
-     * @returns True is client is connected to the the remote end, false otherwise
+     * @returns True if client is connected to the the remote end, false otherwise or if this instance is in server mode
     */
-    bool isClientConnected() const;
+    bool isConnectedToServer() const;
 
     /**
      *
@@ -263,6 +265,7 @@ public:
                                                      SRTSOCKET newSocket,
                                                      std::shared_ptr<NetworkConnection>& ctx)>
         clientConnected = nullptr;
+
     /// Callback receiving data type vector
     std::function<void(std::unique_ptr<std::vector<uint8_t>>& data,
                        SRT_MSGCTRL& msgCtrl,
@@ -288,16 +291,84 @@ public:
     SRTNet& operator=(SRTNet&&) = delete;      // Move assign
 
 private:
-    // Internal variables and methods
+    // Internal struct for storing the incoming configuration to startClient/Server
+    struct Configuration {
+        std::string mLocalHost;
+        uint16_t mLocalPort;
+        std::string mRemoteHost;
+        uint16_t mRemotePort;
+        int mReorder;
+        int32_t mLatency;
+        int mOverhead;
+        int mMtu;
+        int32_t mPeerIdleTimeout;
+        std::string mPsk;
+    };
 
-    void waitForSRTClient(bool singleSender);
+    /** Internal variables and methods
+     *
+     * The SRT Net class has two base modes, it can act as a server which accepts incoming client connections or as a
+     * client which connects to a server. However, the server mode has two versions of it which is controlled by the
+     * parameter singleClient (@see startServer method).
+     *
+     * If singleClient is true, it means that the server will only accept one single client at the time. The
+     * server will run the serverSingleClientWorker function in a thread, which will synchronously call the
+     * waitForSRTClient function which waits for a successful client connection and then closes the server socket and
+     * returns. It will then proceed by calling the serverEventHandler function, which handles the communication with
+     * the client exclusively until it disconnects or the server is stopped. If the client disconnects, the server will
+     * re-create the server socket and again call the waitForSRTClient function to start waiting for a new connection
+     * from a client.
+     *
+     * If singleClient is false, it means that the server will accept multiple client connections at the same time. The
+     * waitForSRTClient function will run in a thread and accept new clients, adding them to an epoll context, and in
+     * parallel the serverEventHandler function will run in another thread polling events from all clients from the
+     * epoll context. The server socket remains open for incoming clients until the server is stopped.
+     */
 
-    void serverEventHandler();
+    /**
+     * @brief Server worker thread function when server only accepts a single client.
+     */
+    void serverSingleClientWorker();
 
+    /**
+     * @brief Server worker thread function when server accepts multiple clients, otherwise
+     * used as a normal function for accepting one single client connection.
+     * @param singleClient If set to true, the function will exit and close the server socket once the first
+     * client has successfully connected to the server, if set to false the function will keep on accepting
+     * incoming connections until the server is stopped.
+     * @return true if singleClient is true and a client has successfully connected, false otherwise.
+     */
+    bool waitForSRTClient(bool singleClient);
+
+    /**
+     * @brief Server thread function when server accepts multiple clients, otherwise
+     * used as a normal function for handling events for one single client connection.
+     * @param singleClient If set to true, the function will exit if the single accepted client disconnects, if
+     * set to false the function will keep on polling for new events on client sockets until the server is stopped.
+     */
+    void serverEventHandler(bool singleClient);
+
+    /**
+     * @brief Client worker thread function.
+     */
     void clientWorker();
 
+    /**
+     * @brief Server util function that closes all connected client sockets and calls the
+     * clientDisconnected callback for each client.
+     */
     void closeAllClientSockets();
 
+    /**
+     * @brief Util for configuring the server socket.
+     * @return true if socket could be configured, false otherwise.
+     */
+    bool createServerSocket();
+
+    /**
+     * @brief Util for configuring the client socket.
+     * @return true if socket could be configured, false otherwise.
+     */
     bool createClientSocket();
 
     SRT_LOG_HANDLER_FN* logHandler = defaultLogHandler;
@@ -319,17 +390,8 @@ private:
     std::shared_ptr<NetworkConnection> mClientContext = nullptr;
     std::shared_ptr<NetworkConnection> mConnectionContext = nullptr;
     std::atomic<bool> mClientConnected = false;
-    std::string mCallerHost;
-    uint16_t mCallerPort;
 
-    std::string mCallerLocalHost;
-    uint16_t mCallerLocalPort;
-    int mCallerReorder;
-    int32_t mCallerLatency;
-    int mCallerOverhead;
-    int mCallerMtu;
-    int32_t mCallerPeerIdleTimeout;
-    std::string mCallerPsk;
+    Configuration mConfiguration;
 
     const std::chrono::milliseconds kConnectionTimeout{1000};
 };
