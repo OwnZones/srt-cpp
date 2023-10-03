@@ -460,6 +460,14 @@ bool SRTNet::createServerSocket() {
 
     std::optional<sockaddr_in6> ipv6Address = socketAddress.getIPv6();
     if (ipv6Address.has_value()) {
+        if (mConfiguration.mLocalHost == "::") {
+            result = srt_setsockflag(mContext, SRTO_IPV6ONLY, &yes, sizeof(yes));
+            if (result == SRT_ERROR) {
+                SRT_LOGGER(true, LOGG_FATAL, "srt_setsockflag SRTO_IPV6ONLY: " << srt_getlasterror_str());
+                return false;
+            }
+        }
+
         result = srt_bind(mContext, reinterpret_cast<sockaddr*>(&ipv6Address.value()), sizeof(ipv6Address.value()));
         if (result == SRT_ERROR) {
             SRT_LOGGER(true, LOGG_FATAL, "srt_bind: " << srt_getlasterror_str());
