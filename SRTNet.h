@@ -104,8 +104,9 @@ public:
 
     /**
      *
-     * Starts an SRT Client and connects to the server. If the server is currently not listening for connections, the
-     * client will keep on trying to re-connect.
+     * Starts an SRT Client and connects to the server. If the server is currently not listening for connections, or the
+     * client can't reach the server over the network, the client may keep on trying to re-connect or fail to start
+     * depending on the value or \p failOnConnectionError.
      *
      * @param host Remote host IP or hostname
      * @param port Remote host Port
@@ -114,6 +115,10 @@ public:
      * @param overhead % extra of the BW that will be allowed for re-transmission packets
      * @param ctx the context used in the receivedData and receivedDataNoCopy callback
      * @param mtu sets the MTU
+     * @param failOnConnectionError if set to true and the initial connection attempt to the server fails this function
+     * will return false, if set to false the client will start an internal thread that will keep on trying to connect
+     * to the server until stop() is called. If the initial connection attempt is successful, the client will always
+     * try to re-connect to the server in case the client gets disconnected.
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
@@ -127,13 +132,15 @@ public:
                      int overhead,
                      std::shared_ptr<NetworkConnection>& ctx,
                      int mtu,
+                     bool failOnConnectionError,
                      int32_t peerIdleTimeout = 5000,
                      const std::string& psk = "");
 
     /**
      *
      * Starts an SRT Client with a specified local address to bind to and connects to the server. If the server is
-     * currently not listening for connections, the client will keep on trying to re-connect.
+     * currently not listening for connections, or the client can't reach the server over the network, the client may
+     * keep on trying to re-connect or fail to start depending on the value or \p failOnConnectionError.
      *
      * @param host Remote host IP or hostname to connect to
      * @param port Remote host port to connect to
@@ -144,6 +151,10 @@ public:
      * @param overhead % extra of the BW that will be allowed for re-transmission packets
      * @param ctx the context used in the receivedData and receivedDataNoCopy callback
      * @param mtu sets the MTU
+     * @param failOnConnectionError if set to true and the initial connection attempt to the server fails this function
+     * will return false, if set to false the client will start an internal thread that will keep on trying to connect
+     * to the server until stop() is called. If the initial connection attempt is successful, the client will always
+     * try to re-connect to the server in case the client gets disconnected.
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
@@ -159,6 +170,7 @@ public:
                      int overhead,
                      std::shared_ptr<NetworkConnection>& ctx,
                      int mtu,
+                     bool failOnConnectionError,
                      int32_t peerIdleTimeout = 5000,
                      const std::string& psk = "");
 

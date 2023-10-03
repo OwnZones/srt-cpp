@@ -292,9 +292,10 @@ bool SRTNet::startClient(const std::string& host,
                          int overhead,
                          std::shared_ptr<NetworkConnection>& ctx,
                          int mtu,
+                         bool failOnConnectionError,
                          int32_t peerIdleTimeout,
                          const std::string& psk) {
-    return startClient(host, port, "", 0, reorder, latency, overhead, ctx, mtu, peerIdleTimeout, psk);
+    return startClient(host, port, "", 0, reorder, latency, overhead, ctx, mtu, failOnConnectionError, peerIdleTimeout, psk);
 }
 
 // Host can provide a IP or name meaning any IPv4 or IPv6 address or name type www.google.com
@@ -308,6 +309,7 @@ bool SRTNet::startClient(const std::string& host,
                          int overhead,
                          std::shared_ptr<NetworkConnection>& ctx,
                          int mtu,
+                         bool failOnConnectionError,
                          int32_t peerIdleTimeout,
                          const std::string& psk) {
     std::lock_guard<std::mutex> lock(mNetMtx);
@@ -370,7 +372,8 @@ bool SRTNet::startClient(const std::string& host,
     if (result == SRT_ERROR) {
         SRT_LOGGER(true, LOGG_FATAL, "srt_connect failed: " << srt_getlasterror_str() << std::endl);
         int rejectReason = srt_getrejectreason(mContext);
-        if (rejectReason == SRT_REJECT_REASON::SRT_REJ_BADSECRET ||
+        if (failOnConnectionError ||
+            rejectReason == SRT_REJECT_REASON::SRT_REJ_BADSECRET ||
             rejectReason == SRT_REJECT_REASON::SRT_REJ_UNSECURE) {
             srt_close(mContext);
             return false;
