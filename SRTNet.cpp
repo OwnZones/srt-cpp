@@ -354,7 +354,6 @@ bool SRTNet::startClient(const std::string& host,
     }
 
     
-    SRT_LOGGER(true, LOGG_ERROR, "SRT connect");
     for (struct addrinfo* resolvedAddress = resolvedAddresses;
          resolvedAddress != nullptr;
          resolvedAddress = resolvedAddress->ai_next) {
@@ -362,7 +361,7 @@ bool SRTNet::startClient(const std::string& host,
                              reinterpret_cast<sockaddr*>(resolvedAddress->ai_addr),
                              resolvedAddress->ai_addrlen);
         if (result != SRT_ERROR) {
-            SRT_LOGGER(true, LOGG_ERROR, "Connected to SRT Server " << std::endl)
+            SRT_LOGGER(true, LOGG_NOTIFY, "Connected to SRT Server " << std::endl)
             mClientConnected = true;
             break;
         }
