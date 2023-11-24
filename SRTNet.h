@@ -244,6 +244,16 @@ public:
 
     /**
      *
+     * @brief Get the bound port of the instance. Useful if the local port was 0 when starting the client or server. In
+     * these cases the SRT library will automatically assign a port and this function will then return which port
+     * is being used.
+     * @returns The bound port of the instance in case it has been assigned, otherwise 0.
+     *
+     */
+    uint16_t getLocallyBoundPort() const;
+
+    /**
+     *
      * @brief Get the current operating mode.
      * @returns The operating mode.
      *

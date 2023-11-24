@@ -511,6 +511,8 @@ TEST_F(TestSRTFixture, BindAddressForCaller) {
     std::pair<std::string, uint16_t> serverIPAndPort = getBindIpAndPortFromSRTSocket(mServer.getBoundSocket());
     EXPECT_EQ(serverIPAndPort.first, "127.0.0.1");
     EXPECT_EQ(serverIPAndPort.second, 8010);
+    EXPECT_EQ(serverIPAndPort.second, mServer.getLocallyBoundPort());
+
 
     std::pair<std::string, uint16_t> clientIPAndPort = getBindIpAndPortFromSRTSocket(mClient.getBoundSocket());
     EXPECT_EQ(clientIPAndPort.first, "127.0.0.1");
@@ -525,6 +527,7 @@ TEST_F(TestSRTFixture, AutomaticPortSelection) {
     std::pair<std::string, uint16_t> serverIPAndPort = getBindIpAndPortFromSRTSocket(mServer.getBoundSocket());
     EXPECT_EQ(serverIPAndPort.first, "0.0.0.0");
     EXPECT_GT(serverIPAndPort.second, 1024); // We expect it won't pick a privileged port
+    EXPECT_EQ(serverIPAndPort.second, mServer.getLocallyBoundPort());
 
     ASSERT_TRUE(mClient.startClient("127.0.0.1", serverIPAndPort.second, "0.0.0.0", kAnyPort, 16, 1000, 100, mClientCtx,
                                    SRT_LIVE_MAX_PLSIZE, true, 5000, kValidPsk));
@@ -600,4 +603,32 @@ TEST_F(TestSRTFixture, SucceedToStartWhenNoServerListens) {
     EXPECT_TRUE(mClient.startClient("127.0.0.1", kPort, 16, 1000, 100, mClientCtx,
                                      SRT_LIVE_MAX_PLSIZE, false, 5000, kValidPsk));
     ASSERT_FALSE(mClient.isConnectedToServer());
+}
+
+TEST_F(TestSRTFixture, GetLocallyBoundPort) {
+    // Before started, server and client should return 0
+    EXPECT_EQ(mServer.getLocallyBoundPort(), 0);
+    EXPECT_EQ(mClient.getLocallyBoundPort(), 0);
+
+    ASSERT_TRUE(
+            mServer.startServer("0.0.0.0", 0, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, mServerCtx));
+    // Server should now have picked a random available port
+    EXPECT_NE(mServer.getLocallyBoundPort(), 0);
+
+    mServer.stop();
+
+    uint16_t kPort = 8024;
+    ASSERT_TRUE(
+            mServer.startServer("0.0.0.0", kPort, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, mServerCtx));
+    // Server should now have picked the port we specified
+    EXPECT_EQ(mServer.getLocallyBoundPort(), kPort);
+
+    ASSERT_TRUE(mClient.startClient("127.0.0.1", mServer.getLocallyBoundPort(), "0.0.0.0", 8025, 16, 1000, 100, mClientCtx, SRT_LIVE_MAX_PLSIZE,
+                                    true, 5000, kValidPsk));
+    EXPECT_EQ(mClient.getLocallyBoundPort(), 8025);
+
+    mClient.stop();
+    ASSERT_TRUE(mClient.startClient("127.0.0.1", mServer.getLocallyBoundPort(), "0.0.0.0", 0, 16, 1000, 100, mClientCtx, SRT_LIVE_MAX_PLSIZE,
+                                    true, 5000, kValidPsk));
+    EXPECT_NE(mClient.getLocallyBoundPort(), 0);
 }

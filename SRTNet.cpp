@@ -78,7 +78,7 @@ SRTNet::SRTNet(SRT_LOG_HANDLER_FN* handler, int loglevel) {
 
 SRTNet::~SRTNet() {
     stop();
-    SRT_LOGGER(true, LOGG_NOTIFY, "SRTNet destruct")
+    SRT_LOGGER(true, LOGG_NOTIFY, "SRTNet destruct: " << (mCurrentMode == SRTNet::Mode::client ? "client" : "server"));
 }
 
 void SRTNet::closeAllClientSockets() {
@@ -815,4 +815,23 @@ bool SRTNet::getStatistics(SRT_TRACEBSTATS* currentStats, int clear, int instant
         return false;
     }
     return true;
+}
+
+uint16_t SRTNet::getLocallyBoundPort() const {
+    sockaddr_storage socketName{};
+    int32_t nameLength = sizeof(socketName);
+    int32_t srtStatus =
+        srt_getsockname(getBoundSocket(), reinterpret_cast<sockaddr*>(&socketName), &nameLength);
+    if (srtStatus < 0) {
+        return 0;
+    }
+    if (socketName.ss_family == AF_INET) {
+        sockaddr_in* ipv4Address = reinterpret_cast<sockaddr_in*>(&socketName);
+        return ntohs(ipv4Address->sin_port);
+    } else if (socketName.ss_family == AF_INET6) {
+        sockaddr_in6* ipv6Address = reinterpret_cast<sockaddr_in6*>(&socketName);
+        return ntohs(ipv6Address->sin6_port);
+    }
+
+    return 0;
 }
