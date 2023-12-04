@@ -171,7 +171,7 @@ void SRTNet::serverSingleClientWorker() {
             break;
         }
 
-        SRT_LOGGER(true, LOGG_NOTIFY, "Client disconnected, re-open server socket to allow client to re-connect");
+        SRT_LOGGER(true, LOGG_NOTIFY, "Single client disconnected, wait for new client to connect");
         if (!createServerSocket()) {
             SRT_LOGGER(true, LOGG_ERROR, "Failed to re-create server socket");
             return;
@@ -241,7 +241,7 @@ bool SRTNet::waitForSRTClient(bool singleClient) {
 
     while (mServerActive) {
         struct sockaddr_storage theirAddr = {0};
-        SRT_LOGGER(true, LOGG_NOTIFY, "SRT Server wait for client");
+        SRT_LOGGER(true, LOGG_NOTIFY, "SRT Server wait for client at port: " << getLocallyBoundPort());
         int addrSize = sizeof(theirAddr);
         SRTSOCKET newSocketCandidate = srt_accept(mContext, reinterpret_cast<sockaddr*>(&theirAddr), &addrSize);
         if (newSocketCandidate == -1) {
@@ -483,6 +483,12 @@ bool SRTNet::createServerSocket() {
         SRT_LOGGER(true, LOGG_FATAL, "srt_listen: " << srt_getlasterror_str());
         srt_close(mContext);
         return false;
+    }
+
+    // If server was started with local port 0, update the configuration with the actual port. So in case we're in
+    // single client mode, we can re-open the same port if client disconnects.
+    if (mConfiguration.mLocalPort == 0) {
+        mConfiguration.mLocalPort = getLocallyBoundPort();
     }
 
     return true;
@@ -781,6 +787,7 @@ bool SRTNet::stop() {
                 return false;
             }
         }
+        mClientConnected = false;
 
         if (mWorkerThread.joinable()) {
             mWorkerThread.join();
