@@ -74,6 +74,11 @@ public:
         };
 
         mServer.clientDisconnected = [&](std::shared_ptr<SRTNet::NetworkConnection>& ctx, SRTSOCKET lSocket) {
+            {
+                std::lock_guard<std::mutex> lock(mConnectedMutex);
+                mConnected = false;
+            }
+            mConnectedCondition.notify_one();
             EXPECT_EQ(ctx, mConnectionCtx);
         };
 
@@ -82,6 +87,12 @@ public:
     bool waitForClientToConnect(std::chrono::seconds timeout) {
         std::unique_lock<std::mutex> lock(mConnectedMutex);
         bool successfulWait = mConnectedCondition.wait_for(lock, timeout, [&]() { return mConnected; });
+        return successfulWait;
+    }
+
+    bool waitForClientToDisconnect(std::chrono::seconds timeout) {
+        std::unique_lock<std::mutex> lock(mConnectedMutex);
+        bool successfulWait = mConnectedCondition.wait_for(lock, timeout, [&]() { return !mConnected; });
         return successfulWait;
     }
 
@@ -520,7 +531,6 @@ TEST_F(TestSRTFixture, BindAddressForCaller) {
 }
 
 TEST_F(TestSRTFixture, AutomaticPortSelection) {
-    const uint16_t kAnyPort = 0;
     ASSERT_TRUE(
         mServer.startServer("0.0.0.0", kAnyPort, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, mServerCtx));
 
@@ -555,6 +565,31 @@ TEST_F(TestSRTFixture, AutomaticPortSelection) {
         }
     });
     EXPECT_EQ(nClients, 1);
+}
+
+TEST_F(TestSRTFixture, AutomaticPortSelectionSingleClient) {
+    ASSERT_TRUE(
+        mServer.startServer("0.0.0.0", kAnyPort, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, true, mServerCtx));
+
+    std::pair<std::string, uint16_t> serverIPAndPort = getBindIpAndPortFromSRTSocket(mServer.getBoundSocket());
+    EXPECT_EQ(serverIPAndPort.first, "0.0.0.0");
+    EXPECT_GT(serverIPAndPort.second, 1024); // We expect it won't pick a privileged port
+    EXPECT_EQ(serverIPAndPort.second, mServer.getLocallyBoundPort());
+
+    ASSERT_TRUE(mClient.startClient("127.0.0.1", serverIPAndPort.second, "0.0.0.0", kAnyPort, 16, 1000, 100, mClientCtx,
+                                    SRT_LIVE_MAX_PLSIZE, true, 5000, kValidPsk));
+
+    ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    ASSERT_TRUE(mClient.isConnectedToServer());
+    ASSERT_TRUE(mClient.stop());
+    ASSERT_FALSE(mClient.isConnectedToServer());
+    ASSERT_TRUE(waitForClientToDisconnect(std::chrono::seconds(2)));
+
+    ASSERT_TRUE(mClient.startClient("127.0.0.1", serverIPAndPort.second, "0.0.0.0", kAnyPort, 16, 1000, 100, mClientCtx,
+                                    SRT_LIVE_MAX_PLSIZE, true, 5000, kValidPsk));
+
+    ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    ASSERT_TRUE(mClient.isConnectedToServer());
 }
 
 TEST_F(TestSRTFixture, FailToBindWhenLocalIPIsMissing) {
@@ -611,7 +646,7 @@ TEST_F(TestSRTFixture, GetLocallyBoundPort) {
     EXPECT_EQ(mClient.getLocallyBoundPort(), 0);
 
     ASSERT_TRUE(
-            mServer.startServer("0.0.0.0", 0, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, mServerCtx));
+            mServer.startServer("0.0.0.0", kAnyPort, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, mServerCtx));
     // Server should now have picked a random available port
     EXPECT_NE(mServer.getLocallyBoundPort(), 0);
 
