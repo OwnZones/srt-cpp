@@ -60,16 +60,13 @@ public:
         std::any mObject;
     };
 
-    SRTNet();
-
     /**
      *
-     * @brief Constructor that also sets a log handler
-     * @param handler The log handler to be used
-     * @param loglevel The log level to use
-     *
+     * @brief Constructor that can set a log prefix which will be added to the start of all log messages from this
+     * wrapper. Log messages from the SRT library will not be affected by this prefix.
+     * @param logPrefix The prefix to add to all log messages created by this wrapper
      **/
-    SRTNet(SRT_LOG_HANDLER_FN* handler, int loglevel);
+    explicit SRTNet(const std::string& logPrefix = "");
 
     virtual ~SRTNet();
 
@@ -280,7 +277,7 @@ public:
      * @param loglevel the log level to use
      *
      */
-    void setLogHandler(SRT_LOG_HANDLER_FN* handler, int loglevel);
+    static void setLogHandler(SRT_LOG_HANDLER_FN* handler, int loglevel);
 
     /// Callback handling connecting clients (only server mode)
     std::function<std::shared_ptr<NetworkConnection>(struct sockaddr& sin,
@@ -371,6 +368,23 @@ private:
     void serverEventHandler(bool singleClient);
 
     /**
+     * @brief Enum for the client connection status.
+     */
+    enum ClientConnectStatus {
+        success, // Client was able to connect to the server
+        failToResolveAddress, // Client was not able to resolve the remote ip or port
+        failToConnect // Client was not able to connect to the server
+    };
+
+    /**
+     * @brief Client function that tries to resolve the ip and port that the client should connect to, then tries to
+     * actually connect to the server using the configuration in mConfiguration.
+     * @return success is the client was able to connect to the server, failToResolveAddress if the remote ip or port
+     * was not valid, failToConnect in case the connection to the server was not successful.
+     */
+    ClientConnectStatus clientConnectToServer();
+
+    /**
      * @brief Client worker thread function.
      */
     void clientWorker();
@@ -393,7 +407,10 @@ private:
      */
     bool createClientSocket();
 
-    SRT_LOG_HANDLER_FN* logHandler = defaultLogHandler;
+    static SRT_LOG_HANDLER_FN* gLogHandler;
+    static int gLogLevel;
+
+    const std::string mLogPrefix;
 
     // Server active? true == yes
     std::atomic<bool> mServerActive = {false};
@@ -403,7 +420,7 @@ private:
     std::thread mWorkerThread;
     std::thread mEventThread;
 
-    SRTSOCKET mContext = 0;
+    SRTSOCKET mContext{SRT_INVALID_SOCK};
     int mPollID = 0;
     mutable std::mutex mNetMtx;
     Mode mCurrentMode = Mode::unknown;
@@ -416,4 +433,5 @@ private:
     Configuration mConfiguration;
 
     const std::chrono::milliseconds kConnectionTimeout{1000};
+    const int64_t kEpollTimeoutMs{500};
 };
