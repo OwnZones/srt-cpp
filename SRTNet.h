@@ -303,6 +303,9 @@ public:
     /// Callback handling disconnecting clients (server and client mode)
     std::function<void(std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET lSocket)> clientDisconnected = nullptr;
 
+    /// Callback called whenever the client gets connected to the server (client mode only)
+    std::function<void(std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET lSocket)> connectedToServer = nullptr;
+
     // delete copy and move constructors and assign operators
     SRTNet(SRTNet const&) = delete;            // Copy construct
     SRTNet(SRTNet&&) = delete;                 // Move construct
