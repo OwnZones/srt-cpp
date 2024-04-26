@@ -256,6 +256,9 @@ SRTNet::ClientConnectStatus SRTNet::clientConnectToServer() {
                              resolvedAddress->ai_addrlen);
         if (result != SRT_ERROR) {
             mClientConnected = true;
+            if (connectedToServer) {
+                connectedToServer(mConnectionContext, mContext);
+            }
             // Break for-loop on first successful connect call
             break;
         }
