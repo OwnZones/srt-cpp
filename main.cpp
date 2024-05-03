@@ -217,10 +217,8 @@ int main(int argc, const char *argv[]) {
     //  std::cout << "The server got " << clients->mClientList->size() << " clients." << std::endl;
     //  clients = nullptr;
 
-    gSRTNetServer.getActiveClients([](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>> &clientList) {
-                                       std::cout << "The server got " << clientList.size() << " client(s)." << std::endl;
-                                   }
-    );
+    std::vector<SRTSOCKET> clientList = gSRTNetServer.getActiveClientSockets();
+    std::cout << "The server got " << clientList.size() << " client(s)." << std::endl;
 
     //Send 300 packets with 10 milliseconds spacing. Packets are 1000 bytes long
     int lTimes = 0;
@@ -272,10 +270,9 @@ int main(int argc, const char *argv[]) {
     //SRT_TRACEBSTATS lCurrentServerStats = {0};
     //mySRTNetServer.getStatistics(&currentServerStats,SRTNetClearStats::yes,SRTNetInstant::no);
 
-    gSRTNetServer.getActiveClients([](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>> &rClientList) {
-                                       std::cout << "The server got " << rClientList.size() << " clients." << std::endl;
-                                   }
-    );
+    clientList = gSRTNetServer.getActiveClientSockets();
+    std::cout << "The server got " << clientList.size() << " client(s)." << std::endl;
+
 
     std::cout << "SRT garbage collect" << std::endl;
     gSRTNetServer.stop();
@@ -285,10 +282,8 @@ int main(int argc, const char *argv[]) {
     std::cout << "stopClient 2" << std::endl;
     gSRTNetClient2.stop();
 
-    gSRTNetServer.getActiveClients([](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>> &clientList) {
-                                       std::cout << "The server got " << clientList.size() << " clients." << std::endl;
-                                   }
-    );
+    clientList = gSRTNetServer.getActiveClientSockets();
+    std::cout << "The server got " << clientList.size() << " client(s)." << std::endl;
 
     srt_cleanup();
     std::cout << "SRT wrapper did end." << std::endl;

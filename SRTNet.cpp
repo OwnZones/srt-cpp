@@ -347,10 +347,22 @@ bool SRTNet::waitForSRTClient(bool singleClient) {
     return false;
 }
 
-void SRTNet::getActiveClients(
-    const std::function<void(std::map<SRTSOCKET, std::shared_ptr<NetworkConnection>>&)>& function) {
+std::vector<std::pair<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>> SRTNet::getActiveClients() const {
     std::lock_guard<std::mutex> lock(mClientListMtx);
-    function(mClientList);
+
+    std::vector<std::pair<SRTSOCKET, std::shared_ptr<NetworkConnection>>> clients;
+    std::copy(mClientList.begin(), mClientList.end(), std::back_inserter(clients));
+    return clients;
+}
+
+std::vector<SRTSOCKET> SRTNet::getActiveClientSockets() const {
+    std::lock_guard<std::mutex> lock(mClientListMtx);
+
+    std::vector<SRTSOCKET> clientSockets(mClientList.size());
+    for (const auto& [socket, networkConnection] : mClientList) {
+        clientSockets.push_back(socket);
+    }
+    return clientSockets;
 }
 
 bool SRTNet::startClient(const std::string& host,
