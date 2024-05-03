@@ -33,6 +33,21 @@ std::pair<std::string, uint16_t> getBindIpAndPortFromSRTSocket(SRTSOCKET socket)
     return {"Unsupported", 0};
 }
 
+bool waitUntil(const std::function<bool()>& function,
+               std::chrono::milliseconds timeout,
+               std::chrono::milliseconds sleepFor) {
+    std::chrono::milliseconds timeLeft = timeout;
+    while (timeLeft > std::chrono::milliseconds(0)) {
+        if (function()) {
+            return true;
+        }
+
+        std::this_thread::sleep_for(sleepFor);
+        timeLeft -= sleepFor;
+    }
+    return function();
+}
+
 ///
 /// @brief Get the remote peer IP address and port of an SRT socket
 /// @param socket The SRT socket to get the peer IP and Port from
@@ -157,6 +172,9 @@ TEST(TestSrt, StartStop) {
         bool successfulWait = connectedCondition.wait_for(lock, std::chrono::seconds(2), [&]() { return connected; });
         ASSERT_TRUE(successfulWait) << "Timeout waiting for client to connect";
     }
+
+    waitUntil([&]() { return !server.getActiveClients().empty(); },
+        std::chrono::seconds(1), std::chrono::milliseconds(10));
 
     const auto activeClients = server.getActiveClients();
     size_t nClients = activeClients.size();
@@ -448,6 +466,8 @@ TEST_F(TestSRTFixture, SingleSender) {
     ASSERT_TRUE(mClient.isConnectedToServer());
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
 
     auto activeClients = mServer.getActiveClients();
     size_t numberOfClients = activeClients.size();
@@ -493,6 +513,8 @@ TEST_F(TestSRTFixture, BindAddressForCaller) {
 
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
 
     const auto activeClients = mServer.getActiveClients();
     size_t numberOfClients = activeClients.size();
@@ -539,6 +561,8 @@ TEST_F(TestSRTFixture, AutomaticPortSelection) {
     EXPECT_GT(clientIPAndPort.second, 1024); // We expect it won't pick a privileged port
     EXPECT_NE(clientIPAndPort.second, serverIPAndPort.second);
 
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
     const auto activeClients = mServer.getActiveClients();
     size_t nClients = activeClients.size();
 
