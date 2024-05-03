@@ -33,6 +33,21 @@ std::pair<std::string, uint16_t> getBindIpAndPortFromSRTSocket(SRTSOCKET socket)
     return {"Unsupported", 0};
 }
 
+bool waitUntil(const std::function<bool()>& function,
+               std::chrono::milliseconds timeout,
+               std::chrono::milliseconds sleepFor) {
+    std::chrono::milliseconds timeLeft = timeout;
+    while (timeLeft > std::chrono::milliseconds(0)) {
+        if (function()) {
+            return true;
+        }
+
+        std::this_thread::sleep_for(sleepFor);
+        timeLeft -= sleepFor;
+    }
+    return function();
+}
+
 ///
 /// @brief Get the remote peer IP address and port of an SRT socket
 /// @param socket The SRT socket to get the peer IP and Port from
@@ -158,15 +173,16 @@ TEST(TestSrt, StartStop) {
         ASSERT_TRUE(successfulWait) << "Timeout waiting for client to connect";
     }
 
-    size_t nClients = 0;
-    server.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        nClients = activeClients.size();
-        for (const auto& socketNetworkConnectionPair : activeClients) {
-            int32_t number = 0;
-            EXPECT_NO_THROW(number = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
-            EXPECT_EQ(number, 1111);
-        }
-    });
+    waitUntil([&]() { return !server.getActiveClients().empty(); },
+        std::chrono::seconds(1), std::chrono::milliseconds(10));
+
+    const auto activeClients = server.getActiveClients();
+    size_t nClients = activeClients.size();
+    for (const auto& socketNetworkConnectionPair : activeClients) {
+        int32_t number = 0;
+        EXPECT_NO_THROW(number = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
+        EXPECT_EQ(number, 1111);
+    }
     EXPECT_EQ(nClients, 1);
 
     auto [srtSocket, networkConnection] = client.getConnectedServer();
@@ -409,10 +425,7 @@ TEST_F(TestSRTFixture, DISABLED_RejectConnection) {
     
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
 
-    size_t numberOfClients = 0;
-    mServer.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        numberOfClients = activeClients.size();
-    });
+    size_t numberOfClients = mServer.getActiveClientSockets().size();
     EXPECT_EQ(numberOfClients, 0);
 
     auto [srtSocket, networkConnection] = mClient.getConnectedServer();
@@ -453,16 +466,16 @@ TEST_F(TestSRTFixture, SingleSender) {
     ASSERT_TRUE(mClient.isConnectedToServer());
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
 
-    size_t numberOfClients = 0;
-    mServer.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        numberOfClients = activeClients.size();
-        for (const auto& socketNetworkConnectionPair : activeClients) {
-            int32_t number = 0;
-            EXPECT_NO_THROW(number = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
-            EXPECT_EQ(number, 1111);
-        }
-    });
+    auto activeClients = mServer.getActiveClients();
+    size_t numberOfClients = activeClients.size();
+    for (const auto& socketNetworkConnectionPair : activeClients) {
+        int32_t number = 0;
+        EXPECT_NO_THROW(number = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
+        EXPECT_EQ(number, 1111);
+    }
     EXPECT_EQ(numberOfClients, 1);
 
     auto [srtSocket, networkConnection] = mClient.getConnectedServer();
@@ -479,14 +492,13 @@ TEST_F(TestSRTFixture, SingleSender) {
     EXPECT_FALSE(client2.isConnectedToServer())
         << "Expect to not be able to connect a second client when server just accepts one client";
 
-    mServer.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        numberOfClients = activeClients.size();
-        for (const auto& socketNetworkConnectionPair : activeClients) {
-            int32_t number = 0;
-            EXPECT_NO_THROW(number = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
-            EXPECT_EQ(number, 1111);
-        }
-    });
+    activeClients = mServer.getActiveClients();
+    numberOfClients = activeClients.size();
+    for (const auto& socketNetworkConnectionPair : activeClients) {
+        int32_t contextNumber = 0;
+        EXPECT_NO_THROW(contextNumber = std::any_cast<int32_t>(socketNetworkConnectionPair.second->mObject));
+        EXPECT_EQ(contextNumber, 1111);
+    }
     EXPECT_EQ(numberOfClients, 1);
 
     EXPECT_TRUE(mServer.stop());
@@ -501,22 +513,22 @@ TEST_F(TestSRTFixture, BindAddressForCaller) {
 
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
 
-    size_t numberOfClients = 0;
-    mServer.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        numberOfClients = activeClients.size();
-        for (const auto& socketNetworkConnectionPair : activeClients) {
-            std::pair<std::string, uint16_t> peerIPAndPort =
+    const auto activeClients = mServer.getActiveClients();
+    size_t numberOfClients = activeClients.size();
+    for (const auto& socketNetworkConnectionPair : activeClients) {
+        std::pair<std::string, uint16_t> peerIPAndPort =
                 getPeerIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
-            EXPECT_EQ(peerIPAndPort.first, "127.0.0.1");
-            EXPECT_EQ(peerIPAndPort.second, 8011);
+        EXPECT_EQ(peerIPAndPort.first, "127.0.0.1");
+        EXPECT_EQ(peerIPAndPort.second, 8011);
 
-            std::pair<std::string, uint16_t> ipAndPort =
+        std::pair<std::string, uint16_t> ipAndPort =
                 getBindIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
-            EXPECT_EQ(ipAndPort.first, "127.0.0.1");
-            EXPECT_EQ(ipAndPort.second, 8010);
-        }
-    });
+        EXPECT_EQ(ipAndPort.first, "127.0.0.1");
+        EXPECT_EQ(ipAndPort.second, 8010);
+    }
     EXPECT_EQ(numberOfClients, 1);
 
     std::pair<std::string, uint16_t> serverIPAndPort = getBindIpAndPortFromSRTSocket(mServer.getBoundSocket());
@@ -549,21 +561,22 @@ TEST_F(TestSRTFixture, AutomaticPortSelection) {
     EXPECT_GT(clientIPAndPort.second, 1024); // We expect it won't pick a privileged port
     EXPECT_NE(clientIPAndPort.second, serverIPAndPort.second);
 
-    size_t nClients = 0;
-    mServer.getActiveClients([&](std::map<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>& activeClients) {
-        nClients = activeClients.size();
-        for (const auto& socketNetworkConnectionPair : activeClients) {
-            std::pair<std::string, uint16_t> peerIPAndPort =
-                getPeerIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
-            EXPECT_EQ(peerIPAndPort.first, "127.0.0.1");
-            EXPECT_EQ(peerIPAndPort.second, clientIPAndPort.second);
+    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
+              std::chrono::seconds(1), std::chrono::milliseconds(10));
+    const auto activeClients = mServer.getActiveClients();
+    size_t nClients = activeClients.size();
 
-            std::pair<std::string, uint16_t> ipAndPort =
-                getBindIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
-            EXPECT_EQ(ipAndPort.first, "127.0.0.1");
-            EXPECT_EQ(ipAndPort.second, serverIPAndPort.second);
-        }
-    });
+    for (const auto& socketNetworkConnectionPair : activeClients) {
+        std::pair<std::string, uint16_t> peerIPAndPort =
+            getPeerIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
+        EXPECT_EQ(peerIPAndPort.first, "127.0.0.1");
+        EXPECT_EQ(peerIPAndPort.second, clientIPAndPort.second);
+
+        std::pair<std::string, uint16_t> ipAndPort =
+            getBindIpAndPortFromSRTSocket(socketNetworkConnectionPair.first);
+        EXPECT_EQ(ipAndPort.first, "127.0.0.1");
+        EXPECT_EQ(ipAndPort.second, serverIPAndPort.second);
+    }
     EXPECT_EQ(nClients, 1);
 }
 

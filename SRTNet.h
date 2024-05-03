@@ -205,13 +205,19 @@ public:
 
     /**
      *
-     * Get active clients (A server method)
+     * @brief Get all active clients (A server method)
+     * @return A vector of pairs containing the SRTSocketHandle (SRTSOCKET) and it's associated NetworkConnection.
      *
-     * @param function. pass a function getting the map containing the list of active connections
-     * Where the map contains the SRTSocketHandle (SRTSOCKET) and it's associated NetworkConnection you provided.
      */
-    void
-    getActiveClients(const std::function<void(std::map<SRTSOCKET, std::shared_ptr<NetworkConnection>>&)>& function);
+    std::vector<std::pair<SRTSOCKET, std::shared_ptr<NetworkConnection>>> getActiveClients() const;
+
+    /**
+     *
+     * @brief Get the socket of all active clients (A server method)
+     * @return A vector containing the SRTSocketHandle (SRTSOCKET) of all active clients.
+     *
+     */
+    std::vector<SRTSOCKET> getActiveClientSockets() const;
 
     /**
      *
@@ -428,7 +434,7 @@ private:
     mutable std::mutex mNetMtx;
     Mode mCurrentMode = Mode::unknown;
     std::map<SRTSOCKET, std::shared_ptr<NetworkConnection>> mClientList = {};
-    std::mutex mClientListMtx;
+    mutable std::mutex mClientListMtx;
     std::shared_ptr<NetworkConnection> mClientContext = nullptr;
     std::shared_ptr<NetworkConnection> mConnectionContext = nullptr;
     std::atomic<bool> mClientConnected = false;
