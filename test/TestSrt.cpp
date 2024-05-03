@@ -173,8 +173,8 @@ TEST(TestSrt, StartStop) {
         ASSERT_TRUE(successfulWait) << "Timeout waiting for client to connect";
     }
 
-    waitUntil([&]() { return !server.getActiveClients().empty(); },
-        std::chrono::seconds(1), std::chrono::milliseconds(10));
+    ASSERT_TRUE(waitUntil([&]() { return !server.getActiveClientSockets().empty(); },
+        std::chrono::seconds(1), std::chrono::milliseconds(10)));
 
     const auto activeClients = server.getActiveClients();
     size_t nClients = activeClients.size();
@@ -466,8 +466,8 @@ TEST_F(TestSRTFixture, SingleSender) {
     ASSERT_TRUE(mClient.isConnectedToServer());
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
-    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
-              std::chrono::seconds(1), std::chrono::milliseconds(10));
+    ASSERT_TRUE(waitUntil([&]() { return !mServer.getActiveClientSockets().empty(); },
+                          std::chrono::seconds(1), std::chrono::milliseconds(10)));
 
     auto activeClients = mServer.getActiveClients();
     size_t numberOfClients = activeClients.size();
@@ -513,8 +513,8 @@ TEST_F(TestSRTFixture, BindAddressForCaller) {
 
 
     ASSERT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
-    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
-              std::chrono::seconds(1), std::chrono::milliseconds(10));
+    ASSERT_TRUE(waitUntil([&]() { return !mServer.getActiveClientSockets().empty(); },
+                          std::chrono::seconds(1), std::chrono::milliseconds(10)));
 
     const auto activeClients = mServer.getActiveClients();
     size_t numberOfClients = activeClients.size();
@@ -561,8 +561,9 @@ TEST_F(TestSRTFixture, AutomaticPortSelection) {
     EXPECT_GT(clientIPAndPort.second, 1024); // We expect it won't pick a privileged port
     EXPECT_NE(clientIPAndPort.second, serverIPAndPort.second);
 
-    waitUntil([&]() { return !mServer.getActiveClients().empty(); },
-              std::chrono::seconds(1), std::chrono::milliseconds(10));
+    ASSERT_TRUE(waitUntil([&]() { return !mServer.getActiveClientSockets().empty(); },
+                          std::chrono::seconds(1), std::chrono::milliseconds(10)));
+
     const auto activeClients = mServer.getActiveClients();
     size_t nClients = activeClients.size();
 
