@@ -220,8 +220,11 @@ void SRTNet::serverEventHandler(bool singleClient) {
             }
         }
 
-        if (singleClient && mClientList.empty()) {
-            break;
+        {
+            std::lock_guard<std::mutex> lock(mClientListMtx);
+            if (singleClient && mClientList.empty()) {
+                break;
+            }
         }
     }
     SRT_LOGGER(true, LOGG_NOTIFY, "serverEventHandler exit");
