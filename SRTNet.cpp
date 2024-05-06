@@ -361,7 +361,8 @@ std::vector<std::pair<SRTSOCKET, std::shared_ptr<SRTNet::NetworkConnection>>> SR
 std::vector<SRTSOCKET> SRTNet::getActiveClientSockets() const {
     std::lock_guard<std::mutex> lock(mClientListMtx);
 
-    std::vector<SRTSOCKET> clientSockets(mClientList.size());
+    std::vector<SRTSOCKET> clientSockets;
+    clientSockets.reserve(mClientList.size());
     for (const auto& [socket, networkConnection] : mClientList) {
         clientSockets.push_back(socket);
     }
