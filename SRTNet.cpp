@@ -260,7 +260,8 @@ SRTNet::ClientConnectStatus SRTNet::clientConnectToServer() {
         if (result != SRT_ERROR) {
             mClientConnected = true;
             if (connectedToServer) {
-                connectedToServer(mConnectionContext, mContext);
+                ConnectionInformation connectionInformation = getConnectionInformation(mContext);
+                connectedToServer(mConnectionContext, mContext, connectionInformation);
             }
             // Break for-loop on first successful connect call
             break;
@@ -315,7 +316,9 @@ bool SRTNet::waitForSRTClient(bool singleClient) {
         }
 
         SRT_LOGGER(true, LOGG_NOTIFY, "Client connected: " << newSocketCandidate);
-        auto ctx = clientConnected(*reinterpret_cast<sockaddr*>(&theirAddr), newSocketCandidate, mConnectionContext);
+
+        ConnectionInformation connectionInformation = getConnectionInformation(newSocketCandidate);
+        auto ctx = clientConnected(*reinterpret_cast<sockaddr*>(&theirAddr), newSocketCandidate, mConnectionContext, connectionInformation);
 
         if (!ctx) {
             // No ctx in return from clientConnected callback means client was rejected by user.
@@ -947,4 +950,30 @@ uint16_t SRTNet::getLocallyBoundPort() const {
     }
 
     return 0;
+}
+
+SRTNet::ConnectionInformation SRTNet::getConnectionInformation(SRTSOCKET socket) {
+    ConnectionInformation connectionInformation;
+
+    uint8_t clientSrtVersion[4];
+    int clientSrtVersionSize = sizeof(clientSrtVersion);
+    if (SRT_ERROR != srt_getsockflag(socket, SRTO_PEERVERSION, &clientSrtVersion, &clientSrtVersionSize)) {
+        // The SRT version is stored as an int (little endian), like 0x00XXYYZZ, where XX is major, YY is minor, and ZZ is patch version
+        connectionInformation.mPeerSrtVersion =
+            std::to_string(static_cast<int32_t>(clientSrtVersion[2])) + "." +
+            std::to_string(static_cast<int32_t>(clientSrtVersion[1])) + "." +
+            std::to_string(static_cast<int32_t>(clientSrtVersion[0]));
+    } else {
+        SRT_LOGGER(true, LOGG_ERROR, "Failed to get peer SRT version from the new connection: " << srt_getlasterror_str());
+    }
+
+    int32_t negotiatedLatency = 0;
+    int negotiatedLatencySize = sizeof(negotiatedLatency);
+    if (SRT_ERROR != srt_getsockflag(socket, SRTO_PEERLATENCY, &negotiatedLatency, &negotiatedLatencySize)) {
+        connectionInformation.mNegotiatedLatency = negotiatedLatency;
+    } else {
+        SRT_LOGGER(true, LOGG_ERROR, "Failed to get peer latency from the new connection: " << srt_getlasterror_str());
+    }
+
+    return connectionInformation;
 }

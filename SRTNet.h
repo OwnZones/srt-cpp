@@ -47,17 +47,20 @@ enum SRTNetInstant : int { no, yes };
 
 class SRTNet {
 public:
-
-    enum class Mode {
-        unknown,
-        server,
-        client
-    };
+    enum class Mode { unknown, server, client };
 
     // Fill this class with all information you need for the duration of the connection both client and server
     class NetworkConnection {
     public:
         std::any mObject;
+    };
+
+    /**
+     * @brief Connection information that is fetched when a client connects to a server.
+     */
+    struct ConnectionInformation {
+        std::string mPeerSrtVersion = "n/a"; // The SRT version of the peer
+        int32_t mNegotiatedLatency = -1;     // The latency that was negotiated with the peer
     };
 
     /**
@@ -231,10 +234,10 @@ public:
     std::pair<SRTSOCKET, std::shared_ptr<NetworkConnection>> getConnectedServer();
 
     /**
-     * 
+     *
      * @brief Check if client is connected to remote end
      * @returns True if client is connected to the the remote end, false otherwise or if this instance is in server mode
-    */
+     */
     bool isConnectedToServer() const;
 
     /**
@@ -260,7 +263,7 @@ public:
      * @brief Get the current operating mode.
      * @returns The operating mode.
      *
-    */
+     */
     Mode getCurrentMode() const;
 
     /**
@@ -274,7 +277,8 @@ public:
      * @param message the line to be logged
      *
      */
-    static void defaultLogHandler(void* opaque, int level, const char* file, int line, const char* area, const char* message);
+    static void
+    defaultLogHandler(void* opaque, int level, const char* file, int line, const char* area, const char* message);
 
     /**
      *
@@ -288,7 +292,8 @@ public:
     /// Callback handling connecting clients (only server mode)
     std::function<std::shared_ptr<NetworkConnection>(struct sockaddr& sin,
                                                      SRTSOCKET newSocket,
-                                                     std::shared_ptr<NetworkConnection>& ctx)>
+                                                     std::shared_ptr<NetworkConnection>& ctx,
+                                                     const ConnectionInformation& connectionInformation)>
         clientConnected = nullptr;
 
     /// Callback receiving data type vector
@@ -310,7 +315,10 @@ public:
     std::function<void(std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET lSocket)> clientDisconnected = nullptr;
 
     /// Callback called whenever the client gets connected to the server (client mode only)
-    std::function<void(std::shared_ptr<NetworkConnection>& ctx, SRTSOCKET lSocket)> connectedToServer = nullptr;
+    std::function<void(std::shared_ptr<NetworkConnection>& ctx,
+                       SRTSOCKET lSocket,
+                       const ConnectionInformation& connectionInformation)>
+        connectedToServer = nullptr;
 
     // delete copy and move constructors and assign operators
     SRTNet(SRTNet const&) = delete;            // Copy construct
@@ -380,9 +388,9 @@ private:
      * @brief Enum for the client connection status.
      */
     enum ClientConnectStatus {
-        success, // Client was able to connect to the server
+        success,              // Client was able to connect to the server
         failToResolveAddress, // Client was not able to resolve the remote ip or port
-        failToConnect // Client was not able to connect to the server
+        failToConnect         // Client was not able to connect to the server
     };
 
     /**
@@ -415,6 +423,12 @@ private:
      * @return true if socket could be configured, false otherwise.
      */
     bool createClientSocket();
+
+    /**
+     * @brief Fetch the connection information from the SRT socket.
+     * @return a ConnectionInformation struct with all the connection information that could be fetched.
+     */
+    ConnectionInformation getConnectionInformation(SRTSOCKET socket);
 
     static SRT_LOG_HANDLER_FN* gLogHandler;
     static int gLogLevel;
