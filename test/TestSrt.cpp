@@ -80,12 +80,14 @@ public:
         // notice when client connects to server
         mServer.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
                                       std::shared_ptr<SRTNet::NetworkConnection>& ctx,
-                                      const SRTNet::ConnectionInformation&) {
+                                      const SRTNet::ConnectionInformation& connectionInformation) {
             {
                 std::lock_guard<std::mutex> lock(mConnectedMutex);
                 mConnected = true;
             }
             mConnectedCondition.notify_one();
+            EXPECT_NE(connectionInformation.mPeerSrtVersion, SRTNet::ConnectionInformation().mPeerSrtVersion);
+            EXPECT_NE(connectionInformation.mNegotiatedLatency, SRTNet::ConnectionInformation().mNegotiatedLatency);
             return mConnectionCtx;
         };
 
@@ -98,6 +100,12 @@ public:
             EXPECT_EQ(ctx, mConnectionCtx);
         };
 
+        mClient.connectedToServer = [&](std::shared_ptr<SRTNet::NetworkConnection>& ctx,
+                SRTSOCKET newSocket,
+                const SRTNet::ConnectionInformation& connectionInformation) {
+            EXPECT_NE(connectionInformation.mPeerSrtVersion, SRTNet::ConnectionInformation().mPeerSrtVersion);
+            EXPECT_NE(connectionInformation.mNegotiatedLatency, SRTNet::ConnectionInformation().mNegotiatedLatency);
+        };
     }
 
     bool waitForClientToConnect(std::chrono::seconds timeout) {
