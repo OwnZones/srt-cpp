@@ -79,12 +79,15 @@ public:
 
         // notice when client connects to server
         mServer.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
-                                      std::shared_ptr<SRTNet::NetworkConnection>& ctx) {
+                                      std::shared_ptr<SRTNet::NetworkConnection>& ctx,
+                                      const SRTNet::ConnectionInformation& connectionInformation) {
             {
                 std::lock_guard<std::mutex> lock(mConnectedMutex);
                 mConnected = true;
             }
             mConnectedCondition.notify_one();
+            EXPECT_NE(connectionInformation.mPeerSrtVersion, SRTNet::ConnectionInformation().mPeerSrtVersion);
+            EXPECT_NE(connectionInformation.mNegotiatedLatency, SRTNet::ConnectionInformation().mNegotiatedLatency);
             return mConnectionCtx;
         };
 
@@ -97,6 +100,12 @@ public:
             EXPECT_EQ(ctx, mConnectionCtx);
         };
 
+        mClient.connectedToServer = [&](std::shared_ptr<SRTNet::NetworkConnection>& ctx,
+                SRTSOCKET newSocket,
+                const SRTNet::ConnectionInformation& connectionInformation) {
+            EXPECT_NE(connectionInformation.mPeerSrtVersion, SRTNet::ConnectionInformation().mPeerSrtVersion);
+            EXPECT_NE(connectionInformation.mNegotiatedLatency, SRTNet::ConnectionInformation().mNegotiatedLatency);
+        };
     }
 
     bool waitForClientToConnect(std::chrono::seconds timeout) {
@@ -150,7 +159,8 @@ TEST(TestSrt, StartStop) {
 
     // notice when client connects to server
     server.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
-                                 std::shared_ptr<SRTNet::NetworkConnection>& ctx) {
+                                 std::shared_ptr<SRTNet::NetworkConnection>& ctx,
+                                 const SRTNet::ConnectionInformation&) {
         {
             std::lock_guard<std::mutex> lock(connectedMutex);
             connected = true;
@@ -239,7 +249,8 @@ TEST(TestSrt, TestPsk) {
 
     auto ctx = std::make_shared<SRTNet::NetworkConnection>();
     server.clientConnected = [&](struct sockaddr& sin, SRTSOCKET newSocket,
-                                 std::shared_ptr<SRTNet::NetworkConnection>& ctx) { return ctx; };
+                                 std::shared_ptr<SRTNet::NetworkConnection>& ctx,
+                                 const SRTNet::ConnectionInformation&) { return ctx; };
     ASSERT_TRUE(server.startServer("127.0.0.1", 8009, 16, 1000, 100, SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false, ctx));
     EXPECT_FALSE(client.startClient("127.0.0.1", 8009, 16, 1000, 100, ctx, SRT_LIVE_MAX_PLSIZE, false, 5000, kInvalidPsk))
         << "Expect to fail when using incorrect PSK";
