@@ -381,8 +381,9 @@ bool SRTNet::startClient(const std::string& host,
                          int mtu,
                          bool failOnConnectionError,
                          int32_t peerIdleTimeout,
-                         const std::string& psk) {
-    return startClient(host, port, "", 0, reorder, latency, overhead, ctx, mtu, failOnConnectionError, peerIdleTimeout, psk);
+                         const std::string& psk,
+                         const std::string& streamId) {
+    return startClient(host, port, "", 0, reorder, latency, overhead, ctx, mtu, failOnConnectionError, peerIdleTimeout, psk, streamId);
 }
 
 // Host can provide an IP or name meaning any IPv4 or IPv6 address or name type www.google.com
@@ -398,7 +399,8 @@ bool SRTNet::startClient(const std::string& host,
                          int mtu,
                          bool failOnConnectionError,
                          int32_t peerIdleTimeout,
-                         const std::string& psk) {
+                         const std::string& psk,
+                         const std::string& streamId) {
     std::lock_guard<std::mutex> lock(mNetMtx);
     if (mCurrentMode != Mode::unknown) {
         SRT_LOGGER(true, LOGG_ERROR,
@@ -419,6 +421,7 @@ bool SRTNet::startClient(const std::string& host,
     mConfiguration.mMtu = mtu;
     mConfiguration.mPeerIdleTimeout = peerIdleTimeout;
     mConfiguration.mPsk = psk;
+    mConfiguration.mStreamId = streamId;
 
     if (!createClientSocket()) {
         SRT_LOGGER(true, LOGG_ERROR, "Failed to create caller socket");
@@ -617,6 +620,17 @@ bool SRTNet::createClientSocket() {
         result = srt_setsockflag(mContext, SRTO_PASSPHRASE, mConfiguration.mPsk.c_str(), mConfiguration.mPsk.length());
         if (result == SRT_ERROR) {
             SRT_LOGGER(true, LOGG_ERROR, "srt_setsockflag SRTO_PASSPHRASE: " << srt_getlasterror_str());
+            return false;
+        }
+    }
+
+    if (!mConfiguration.mStreamId.empty()) {
+        result = srt_setsockflag(mContext, SRTO_STREAMID,
+                                 mConfiguration.mStreamId.c_str(),
+                                 mConfiguration.mStreamId.length());
+        if (result == SRT_ERROR) {
+            SRT_LOGGER(true, LOGG_ERROR,
+                       "srt_setsockflag SRTO_STREAMID: " << srt_getlasterror_str());
             return false;
         }
     }

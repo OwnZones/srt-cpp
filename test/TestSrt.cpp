@@ -692,3 +692,30 @@ TEST_F(TestSRTFixture, GetLocallyBoundPort) {
                                     true, 5000, kValidPsk));
     EXPECT_NE(mClient.getLocallyBoundPort(), 0);
 }
+
+TEST_F(TestSRTFixture, StreamId) {
+    SRTNet server;
+    SRTNet client;
+    const std::string sentStreamId = "An example Stream ID";
+    char receivedStreamId[1024];
+
+    auto ctx = std::make_shared<SRTNet::NetworkConnection>();
+    server.clientConnected = [&](struct sockaddr &sin, SRTSOCKET newSocket,
+                                 std::shared_ptr<SRTNet::NetworkConnection> &ctx,
+                                 const SRTNet::ConnectionInformation &) {
+        int size = 1024;
+        EXPECT_NE(srt_getsockflag(newSocket, SRTO_STREAMID, receivedStreamId, &size), SRT_ERROR);
+        EXPECT_EQ(size, sentStreamId.size());
+        mConnected = true;
+        return ctx;
+    };
+
+    ASSERT_TRUE(server.startServer("127.0.0.1", 8009, 16, 1000, 100,
+                                   SRT_LIVE_MAX_PLSIZE, 5000, kValidPsk, false,
+                                   ctx));
+    ASSERT_TRUE(client.startClient("127.0.0.1", 8009, 16, 1000, 100, ctx,
+                                   SRT_LIVE_MAX_PLSIZE, true, 5000, kValidPsk,
+                                   sentStreamId));
+    EXPECT_TRUE(waitForClientToConnect(std::chrono::seconds(2)));
+    ASSERT_EQ(sentStreamId, std::string(receivedStreamId));
+}

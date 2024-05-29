@@ -122,6 +122,7 @@ public:
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
+     * @param streamId Optional Stream ID
      * @return true if configuration was accepted and remote IP port could be resolved, false otherwise. It will also
      * return false in case the connection can be made but the provided PSK doesn't match the PSK on the server.
      */
@@ -134,7 +135,8 @@ public:
                      int mtu,
                      bool failOnConnectionError,
                      int32_t peerIdleTimeout = 5000,
-                     const std::string& psk = "");
+                     const std::string& psk = "",
+                     const std::string& streamId = "");
 
     /**
      *
@@ -158,6 +160,7 @@ public:
      * @param peerIdleTimeout Optional Connection considered broken if no packet received before this timeout.
      * Defaults to 5 seconds.
      * @param psk Optional Pre Shared Key (AES-128)
+     * @param streamId Optional Stream ID
      * @return true if configuration was accepted and remote IP port could be resolved, false otherwise. It will also
      * return false in case the connection can be made but the provided PSK doesn't match the PSK on the server.
      */
@@ -172,7 +175,8 @@ public:
                      int mtu,
                      bool failOnConnectionError,
                      int32_t peerIdleTimeout = 5000,
-                     const std::string& psk = "");
+                     const std::string& psk = "",
+                     const std::string& streamId = "");
 
     /**
      *
@@ -339,6 +343,7 @@ private:
         int mMtu;
         int32_t mPeerIdleTimeout;
         std::string mPsk;
+        std::string mStreamId;
     };
 
     /** Internal variables and methods
