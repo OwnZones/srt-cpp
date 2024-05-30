@@ -9,7 +9,7 @@ on:
 jobs:
   test-release:
 
-    runs-on: ubuntu-22.04
+    runs-on: stardom-nuc
 
     steps:
       - uses: actions/checkout@v2
@@ -22,6 +22,7 @@ jobs:
       - name: Build release
         run: |
           cd build
+          echo "dummy"
           make runUnitTests
       - name: Run tests with release
         run: |
@@ -30,7 +31,7 @@ jobs:
 
   test-debug:
 
-    runs-on: ubuntu-22.04
+    runs-on: stardom-nuc
 
     steps:
       - uses: actions/checkout@v2
