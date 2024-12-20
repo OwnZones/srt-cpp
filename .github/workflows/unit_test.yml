@@ -9,13 +9,13 @@ on:
 jobs:
   test-release:
 
-    runs-on: stardom-nuc
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v2
       - name: CMake set-up for release
         run: |
-          rm -rf build
+          sudo apt update && sudo apt install -y libgtest-dev
           mkdir build
           cd build
           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
@@ -30,13 +30,13 @@ jobs:
 
   test-debug:
 
-    runs-on: stardom-nuc
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v2
       - name: CMake set-up for debug
         run: |
-          rm -rf build
+          sudo apt update && sudo apt install -y libgtest-dev
           mkdir build
           cd build
           cmake -DCMAKE_BUILD_TYPE=Debug ..
