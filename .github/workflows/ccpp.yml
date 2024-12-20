@@ -7,7 +7,7 @@ jobs:
     name: build_ubuntu_22.04
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: install
       run: sudo apt -y install tclsh pkg-config libssl-dev libgtest-dev
     - name: cmake
