@@ -899,10 +899,6 @@ bool SRTNet::stop() {
     } else if (mCurrentMode == Mode::client) {
         mClientActive = false;
 
-        if (mWorkerThread.joinable()) {
-            mWorkerThread.join();
-        }
-
         std::lock_guard<std::mutex> lock(mNetMtx);
         if (mContext != SRT_INVALID_SOCK) {
             int result = srt_close(mContext);
@@ -912,6 +908,11 @@ bool SRTNet::stop() {
                 return false;
             }
         }
+
+        if (mWorkerThread.joinable()) {
+            mWorkerThread.join();
+        }
+
         mClientConnected = false;
 
         SRT_LOGGER(true, LOGG_NOTIFY, "Client stopped");
